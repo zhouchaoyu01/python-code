@@ -2,7 +2,7 @@
 
 ## 项目简介
 这是一个用于聊天模型的 Python 项目。
-
+python3.11
 ## 安装步骤
 1. 克隆这个仓库：
    ```bash
@@ -14,8 +14,8 @@
    ```
 3. 创建并激活虚拟环境：
    ```bash
-   python -m venv .venv
-   .venv\Scripts\activate
+   python -m venv aivenv
+   aivenv\Scripts\activate
    ```
 4. 安装依赖：
    ```bash
