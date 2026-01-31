@@ -1,0 +1,14 @@
+{
+    "name": "JSONLoader",
+    "description": "Load JSON files as documents.",
+    "array":[
+        {
+            "file_path": "./data/0131.json",
+            "encoding": "utf-8"
+        },
+        {
+            "file_path": "./data/another_file.json",
+            "encoding": "utf-8"
+        }
+    ]
+}
