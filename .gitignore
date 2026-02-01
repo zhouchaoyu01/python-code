@@ -4,5 +4,6 @@ __pycache__/
 *.pyo
 
 aivenv/
-chrome_data/
+chroma_data/
+chat_history/
 ragv1/
