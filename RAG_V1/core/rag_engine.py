@@ -4,6 +4,14 @@ from langchain_core.runnables import RunnablePassthrough
 from .model_factory import ModelFactory
 from .vector_manager import VectorManager
 
+def print_debug_prompt(prompt) -> str:
+    """调试用，打印最终发送给 LLM 的 Prompt"""
+    print("===== Prompt Start =====")
+    print(prompt.to_string())
+    print("===== Prompt End =====")
+    return prompt
+
+
 class RAGEngine:
     def __init__(self):
         self.llm = ModelFactory.get_llm()
@@ -48,6 +56,7 @@ class RAGEngine:
         rag_chain = (
             {"context": base_retriever | self._format_docs, "question": RunnablePassthrough()}
             | prompt
+            | print_debug_prompt
             | self.llm
             | StrOutputParser()
         )
