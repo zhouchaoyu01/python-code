@@ -18,6 +18,11 @@ class VectorManager:
             self.vector_store.add_documents(batch)
             
     def get_retriever(self):
+         # similarity_score_threshold: 仅返回相似度高于阈值的片段
         return self.vector_store.as_retriever(
-            search_kwargs={"k": settings.top_k}
-        )
+            search_type="similarity_score_threshold",
+            search_kwargs={
+                "k": settings.top_k,
+                "score_threshold": 0.5  # 建议根据测试在 0.4-0.6 之间调整
+            }
+    )

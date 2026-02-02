@@ -1,5 +1,6 @@
 import os
 import logging
+from time import time
 from typing import List
 from pathlib import Path
 
@@ -38,8 +39,11 @@ class DocumentProcessor:
             else:
                 logger.warning(f"暂不支持的文件格式: {ext}")
                 return []
-            
-            return loader.load()
+            docs = loader.load()
+            for doc in docs:
+                doc.metadata["upload_time"] = time.time() # 记录上传时间
+                doc.metadata["file_name"] = os.path.basename(file_path)
+            return 
         except Exception as e:
             logger.error(f"解析文件 {file_path} 出错: {e}")
             return []

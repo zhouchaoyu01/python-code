@@ -11,8 +11,19 @@ class RAGEngine:
         self.retriever = self.vector_manager.get_retriever()
 
     def _format_docs(self, docs):
-        """格式化检索到的文档，方便注入 Prompt"""
-        return "\n\n".join(doc.page_content for doc in docs)
+        """增加去重逻辑"""
+        seen_content = set()
+        unique_docs = []
+        for doc in docs:
+            if doc.page_content not in seen_content:
+                unique_docs.append(doc.page_content)
+                seen_content.add(doc.page_content)
+        
+        # 如果检索不到任何内容，返回一个提示词而不是空字符串
+        if not unique_docs:
+            return "【暂无相关参考文档，请提示用户根据已知常识回答或补充知识库】"
+        
+        return "\n\n".join(unique_docs)
 
     def get_chain(self):
         """构建 RAG 链"""
@@ -27,11 +38,15 @@ class RAGEngine:
 
 回答要求：请使用 Markdown 格式，回答简洁专业。"""
 
+
+        base_retriever = self.vector_manager.get_retriever()
+    
+
         prompt = ChatPromptTemplate.from_template(template)
 
         # 构建 LCEL 链
         rag_chain = (
-            {"context": self.retriever | self._format_docs, "question": RunnablePassthrough()}
+            {"context": base_retriever | self._format_docs, "question": RunnablePassthrough()}
             | prompt
             | self.llm
             | StrOutputParser()
