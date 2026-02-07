@@ -1,0 +1,49 @@
+2026-02-07 18:28:58,515 - VectorManager - INFO - [vector_manager.py:23] - 向量库初始化成功，存储路径: ./ragv1/data/chroma_db
+2026-02-07 18:28:58,516 - VectorManager - INFO - [vector_manager.py:71] - 获取检索器，K=4, 阈值=0.5
+2026-02-07 18:28:58,535 - VectorManager - INFO - [vector_manager.py:23] - 向量库初始化成功，存储路径: ./ragv1/data/chroma_db
+2026-02-07 18:30:16,910 - MainAPI - INFO - [main.py:65] - Saving uploaded file to: D:\project\python-code\RAG_V1\temp_uploads\082011d1-fb89-4a31-8d2d-5396122d127e算法背诵版.pdf
+2026-02-07 18:30:16,912 - MainAPI - INFO - [main.py:84] - 文件保存成功，开始处理...
+2026-02-07 18:30:17,376 - VectorManager - INFO - [vector_manager.py:33] - 开始处理文件入库: 算法背诵版.pdf, Hash: 7c72aa28982271253b0ef6c307911458442ea51405969972777b804dae55cd7e
+2026-02-07 18:30:20,519 - VectorManager - INFO - [vector_manager.py:52] - 文件 算法背诵版.pdf 入库成功，共 27 个切片
+2026-02-07 18:31:09,290 - RAGEngine - INFO - [rag_engine.py:15] - ===== Prompt Start =====
+2026-02-07 18:31:09,291 - RAGEngine - INFO - [rag_engine.py:16] - System: 给定聊天记录和用户最新的问题，将其重写为一个可以独立理解的问题。不要回答问题，只需重写，如果不需要重写则直接返回原始问题。
+Human: 我上传的算法文件介绍一下大纲及核心内容
+2026-02-07 18:31:09,292 - RAGEngine - INFO - [rag_engine.py:17] - ===== Prompt End =====
+2026-02-07 18:31:10,557 - RAGEngine - INFO - [rag_engine.py:64] - 对话历史改写后的独立问题: {'input': '我上传的算法文件介绍一下大纲及核心内容', 'chat_history': [], 'standalone_question': '请介绍一下我上传的算法文件的大纲及核心内容。'}
+2026-02-07 18:31:11,447 - RAGEngine - INFO - [rag_engine.py:45] - --- 向量检索完成，命中数量: 0 ---
+2026-02-07 18:31:11,448 - RAGEngine - WARNING - [rag_engine.py:55] - 检索结果为空！可能是由于相似度阈值过滤了所有结果。
+2026-02-07 18:31:11,453 - RAGEngine - INFO - [rag_engine.py:15] - ===== Prompt Start =====
+2026-02-07 18:31:11,454 - RAGEngine - INFO - [rag_engine.py:16] - System: 你是一个专业的企业助手。请利用以下参考内容和聊天历史回答问题。如果你不知道答案，就直说不知道。请保持回答简洁专业。
+
+参考内容:
+【暂无相关参考文档，请提示用户根据已知常识回答】
+Human: 我上传的算法文件介绍一下大纲及核心内容
+2026-02-07 18:31:11,456 - RAGEngine - INFO - [rag_engine.py:17] - ===== Prompt End =====
+2026-02-07 18:32:35,382 - RAGEngine - INFO - [rag_engine.py:15] - ===== Prompt Start =====
+2026-02-07 18:32:35,383 - RAGEngine - INFO - [rag_engine.py:16] - System: 给定聊天记录和用户最新的问题，将其重写为一个可以独立理解的问题。不要回答问题，只需重写，如果不需要重写则直接返回原始问题。
+Human: 我上传的算法文件介绍一下大纲及核心内容
+AI: 抱歉，我无法查看或读取您上传的文件，因此无法介绍其大纲及核心内容。请您提供算法文件的相关描述，例如：  
+- 算法名称或类型（如决策树、LSTM、YOLO等）  
+- 应用场景（如图像分类、时序预测、推荐系统等）  
+- 主要输入/输出、关键技术点（如损失函数、优化方法、网络结构等）  
+
+我将基于您提供的信息，帮您梳理大纲与核心内容。
+Human: 算法背诵版.pdf的内容
+2026-02-07 18:32:35,385 - RAGEngine - INFO - [rag_engine.py:17] - ===== Prompt End =====
+2026-02-07 18:32:38,309 - RAGEngine - INFO - [rag_engine.py:64] - 对话历史改写后的独立问题: {'input': '算法背诵版.pdf的内容', 'chat_history': [HumanMessage(content='我上传的算法文件介绍一下大纲及核心内容', additional_kwargs={}, response_metadata={}), AIMessage(content='抱歉，我无法查看或读取您上传的文件，因此无法介绍其大纲及核心内容。请您提供算法文件的相关描述，例如：  \n- 算法名称或类型（如决策树、LSTM、YOLO等）  \n- 应用场景（如图像分类、时序预测、推荐系统等）  \n- 主要输入/输出、关键技术点（如损失函数、优化方法、网络结构等）  \n\n我将基于您提供的信息，帮您梳理大纲与核心内容。', additional_kwargs={}, response_metadata={}, tool_calls=[], invalid_tool_calls=[])], 'standalone_question': '您提到的“算法背诵版.pdf”文件，我无法访问、读取或查看其内容（包括本地上传的PDF文件）。因此，无法为您介绍该PDF的具体大纲及核心内容。\n\n请您提供该文件中的文字摘要、目录结构、或关键章节标题与要点（例如：包含哪些经典算法？是否按数据结构/算法类型/面试高频分类？是否有代码片段或复杂度分析？），我将据此帮您整理清晰的大纲和核心内容总结。'}
+2026-02-07 18:32:39,175 - RAGEngine - INFO - [rag_engine.py:45] - --- 向量检索完成，命中数量: 0 ---
+2026-02-07 18:32:39,175 - RAGEngine - WARNING - [rag_engine.py:55] - 检索结果为空！可能是由于相似度阈值过滤了所有结果。
+2026-02-07 18:32:39,180 - RAGEngine - INFO - [rag_engine.py:15] - ===== Prompt Start =====
+2026-02-07 18:32:39,181 - RAGEngine - INFO - [rag_engine.py:16] - System: 你是一个专业的企业助手。请利用以下参考内容和聊天历史回答问题。如果你不知道答案，就直说不知道。请保持回答简洁专业。
+
+参考内容:
+【暂无相关参考文档，请提示用户根据已知常识回答】
+Human: 我上传的算法文件介绍一下大纲及核心内容
+AI: 抱歉，我无法查看或读取您上传的文件，因此无法介绍其大纲及核心内容。请您提供算法文件的相关描述，例如：  
+- 算法名称或类型（如决策树、LSTM、YOLO等）  
+- 应用场景（如图像分类、时序预测、推荐系统等）  
+- 主要输入/输出、关键技术点（如损失函数、优化方法、网络结构等）  
+
+我将基于您提供的信息，帮您梳理大纲与核心内容。
+Human: 算法背诵版.pdf的内容
+2026-02-07 18:32:39,184 - RAGEngine - INFO - [rag_engine.py:17] - ===== Prompt End =====

@@ -11,6 +11,11 @@ from core.vector_manager import VectorManager
 from utils.document_processor import DocumentProcessor
 from utils.hash_utils import calculate_file_hash
 from pathlib import Path  # 引入 Path 处理路径
+from utils.logger import setup_logger
+logger = setup_logger("MainAPI")
+
+
+
 # 初始化 FastAPI 应用
 app = FastAPI(
     title="企业级 RAG 助手 API",
@@ -57,7 +62,7 @@ async def upload_document(file: UploadFile = File(...)):
     unique_filename = f"{uuid.uuid4()}{file.filename}"
      # 3. 生成唯一文件名，拼接完整文件路径
     file_path = temp_dir / unique_filename
-    print(f"Saving uploaded file to: {file_path}")
+    logger.info(f"Saving uploaded file to: {file_path}")
 
 
     try:
@@ -76,7 +81,7 @@ async def upload_document(file: UploadFile = File(...)):
 
         # return {"message": f"文件 {file.filename} 已成功处理并入库", "chunks": len(splits)}
 
-        print("文件保存成功，开始处理...")
+        logger.info("文件保存成功，开始处理...")
         # 将耗时的同步任务交给线程池处理，防止阻塞 API
         def process_task():
             file_hash = calculate_file_hash(file_path)
@@ -115,7 +120,7 @@ async def chat(request: ChatRequest):
         return {"answer": response, "status": "success"}
     except Exception as e:
         # 打印详细日志方便调试
-        print(f"Chat Error: {e}")
+        logger.error(f"Chat Error: {str(e)}", exc_info=True)
         import traceback
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail=str(e))

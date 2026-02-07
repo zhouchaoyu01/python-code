@@ -4,11 +4,17 @@ from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from .model_factory import ModelFactory
 from .vector_manager import VectorManager
 from operator import itemgetter # 引入这个工具，专门用于从字典取值
-def print_debug_prompt(prompt) -> str:
+
+
+from utils.logger import setup_logger
+logger = setup_logger("RAGEngine")
+
+def print_debug_prompt(prompt) -> ChatPromptTemplate:
     """调试用，打印最终发送给 LLM 的 Prompt"""
-    print("===== Prompt Start =====")
-    print(prompt.to_string())
-    print("===== Prompt End =====")
+    logger = setup_logger("RAGEngine")
+    logger.info("===== Prompt Start =====")
+    logger.info(prompt.to_string())
+    logger.info("===== Prompt End =====")
     return prompt
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -35,13 +41,18 @@ class RAGEngine:
 
     def _format_docs(self, docs):
         """保持原有的去重与空结果处理逻辑"""
+        # 增加打印，方便在控制台调试
+        logger.info(f"--- 向量检索完成，命中数量: {len(docs)} ---")
         seen = set()
         unique_docs = []
-        for doc in docs:
+        for i, doc in enumerate(docs):
+             # 记录每条命中的内容预览和分值（如果有）
+            logger.info(f"命中片段 [{i}] 来源: {doc.metadata.get('file_name')} | 内容: {doc.page_content[:50]}...")
             if doc.page_content not in seen:
                 unique_docs.append(doc.page_content)
                 seen.add(doc.page_content)
         if not unique_docs:
+            logger.warning("检索结果为空！可能是由于相似度阈值过滤了所有结果。")
             return "【暂无相关参考文档，请提示用户根据已知常识回答】"
         return "\n\n".join(unique_docs)
     
@@ -49,7 +60,9 @@ class RAGEngine:
         """
         使用 LCEL 构建 1.0 风格的 RAG 链
         """
-        
+        def log_rephrased_question(data):
+            logger.info(f"对话历史改写后的独立问题: {data}")
+            return data
         # 1. 问题重写子链 (Condense Question Chain)
         # 作用：把 (chat_history + input) -> 转换为独立的问题
         rephrase_system_prompt = (
@@ -64,7 +77,7 @@ class RAGEngine:
         ])
         
         # 这是一个微型的 LCEL 链：Prompt -> LLM -> String
-        condense_question_chain = rephrase_prompt | self.llm | StrOutputParser() 
+        condense_question_chain = rephrase_prompt |RunnableLambda(print_debug_prompt)| self.llm | StrOutputParser() 
 
 
         # 2. 最终问答子链 (Answer Generation Chain)
@@ -86,11 +99,13 @@ class RAGEngine:
                 # 第一步：先通过重写链得到独立问题
                 standalone_question=condense_question_chain
             )
+            | RunnableLambda(log_rephrased_question) # 记录中间结果
             | RunnablePassthrough.assign(
                 # 第二步：用重写后的问题去检索文档，并格式化
                  context=itemgetter("standalone_question") | self.retriever | self._format_docs
             )
             | qa_prompt  # 第三步：将所有数据喂给问答 Prompt
+            | RunnableLambda(print_debug_prompt)
             | self.llm   # 第四步：调用 LLM
             | StrOutputParser() # 第五步：解析输出
         )
