@@ -1,9 +1,9 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from .model_factory import ModelFactory
 from .vector_manager import VectorManager
-
+from operator import itemgetter # 引入这个工具，专门用于从字典取值
 def print_debug_prompt(prompt) -> str:
     """调试用，打印最终发送给 LLM 的 Prompt"""
     print("===== Prompt Start =====")
@@ -11,6 +11,21 @@ def print_debug_prompt(prompt) -> str:
     print("===== Prompt End =====")
     return prompt
 
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
+
+store = {}
+
+def get_session_history(session_id: str):
+    if session_id not in store:
+        store[session_id] = ChatMessageHistory()
+    # 滑动窗口：保留最近 10 条（约 5 轮对话）
+    if len(store[session_id].messages) > 10:
+        recent = store[session_id].messages[-10:]
+        store[session_id].clear()
+        store[session_id].add_messages(recent)
+    return store[session_id]
 
 class RAGEngine:
     def __init__(self):
@@ -19,45 +34,72 @@ class RAGEngine:
         self.retriever = self.vector_manager.get_retriever()
 
     def _format_docs(self, docs):
-        """增加去重逻辑"""
-        seen_content = set()
+        """保持原有的去重与空结果处理逻辑"""
+        seen = set()
         unique_docs = []
         for doc in docs:
-            if doc.page_content not in seen_content:
+            if doc.page_content not in seen:
                 unique_docs.append(doc.page_content)
-                seen_content.add(doc.page_content)
-        
-        # 如果检索不到任何内容，返回一个提示词而不是空字符串
+                seen.add(doc.page_content)
         if not unique_docs:
-            return "【暂无相关参考文档，请提示用户根据已知常识回答或补充知识库】"
-        
+            return "【暂无相关参考文档，请提示用户根据已知常识回答】"
         return "\n\n".join(unique_docs)
-
-    def get_chain(self):
-        """构建 RAG 链"""
-        # 定义 Prompt 模板
-        template = """你是一个专业的企业助手。请根据以下提供的上下文信息回答用户的问题。
-如果你在上下文中找不到答案，请诚实地告诉用户你不知道，不要试图编造答案。
-
-上下文内容:
-{context}
-
-用户问题: {question}
-
-回答要求：请使用 Markdown 格式，回答简洁专业。"""
-
-
-        base_retriever = self.vector_manager.get_retriever()
     
-
-        prompt = ChatPromptTemplate.from_template(template)
-
-        # 构建 LCEL 链
-        rag_chain = (
-            {"context": base_retriever | self._format_docs, "question": RunnablePassthrough()}
-            | prompt
-            | print_debug_prompt
-            | self.llm
-            | StrOutputParser()
+    def get_chain(self):
+        """
+        使用 LCEL 构建 1.0 风格的 RAG 链
+        """
+        
+        # 1. 问题重写子链 (Condense Question Chain)
+        # 作用：把 (chat_history + input) -> 转换为独立的问题
+        rephrase_system_prompt = (
+            "给定聊天记录和用户最新的问题，"
+            "将其重写为一个可以独立理解的问题。不要回答问题，"
+            "只需重写，如果不需要重写则直接返回原始问题。"
         )
-        return rag_chain
+        rephrase_prompt = ChatPromptTemplate.from_messages([
+            ("system", rephrase_system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+        ])
+        
+        # 这是一个微型的 LCEL 链：Prompt -> LLM -> String
+        condense_question_chain = rephrase_prompt | self.llm | StrOutputParser() 
+
+
+        # 2. 最终问答子链 (Answer Generation Chain)
+        qa_system_prompt = (
+            "你是一个专业的企业助手。请利用以下参考内容和聊天历史回答问题。"
+            "如果你不知道答案，就直说不知道。请保持回答简洁专业。"
+            "\n\n参考内容:\n{context}"
+        )
+        qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", qa_system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+        ])
+
+        # 3. 完整 LCEL 组合逻辑
+        # 关键点：使用 RunnablePassthrough.assign 动态构建上下文数据流
+        full_rag_chain = (
+            RunnablePassthrough.assign(
+                # 第一步：先通过重写链得到独立问题
+                standalone_question=condense_question_chain
+            )
+            | RunnablePassthrough.assign(
+                # 第二步：用重写后的问题去检索文档，并格式化
+                 context=itemgetter("standalone_question") | self.retriever | self._format_docs
+            )
+            | qa_prompt  # 第三步：将所有数据喂给问答 Prompt
+            | self.llm   # 第四步：调用 LLM
+            | StrOutputParser() # 第五步：解析输出
+        )
+
+        # 4. 封装记忆组件
+        # 注意：RunnableWithMessageHistory 要求 input 和 chat_history 键名匹配
+        return RunnableWithMessageHistory(
+            full_rag_chain,
+            get_session_history,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+        )

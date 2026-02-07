@@ -12,7 +12,7 @@ class ModelFactory:
             model=settings.llm_model,
             dashscope_api_key=settings.dashscope_api_key,
             streaming=True,  # 支持流式输出
-            temperature=0.7,
+            temperature=0.3,
             # 阿里官方 SDK 有时会有连接抖动，在这里可以配置底层重试逻辑
             max_retries=3
         )

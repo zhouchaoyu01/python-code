@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import os
+import uuid
 
 # --- 配置区 ---
 # 指向你刚才启动的 FastAPI 地址
@@ -14,7 +15,8 @@ st.set_page_config(
 
 st.title("🤖 企业级 RAG 问答助手")
 st.markdown("---")
-
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 # --- 侧边栏：文档上传 ---
 with st.sidebar:
     st.header("知识库管理")
@@ -41,7 +43,15 @@ with st.sidebar:
     if st.button("🗑️ 清空对话历史"):
         st.session_state.messages = []
         st.rerun()
-
+    st.markdown("---")
+    st.subheader("已加载文档")
+    files = requests.get(f"{BASE_URL}/files").json()
+    for f in files:
+        col1, col2 = st.columns([0.8, 0.2])
+        col1.caption(f"📄 {f['file_name']}")
+        if col2.button("🗑️", key=f['file_hash']):
+            requests.delete(f"{BASE_URL}/files/{f['file_hash']}")
+            st.rerun()
 # --- 主界面：聊天窗口 ---
 
 # 初始化聊天历史
@@ -66,7 +76,7 @@ if prompt := st.chat_input("请输入您关于文档的问题..."):
             try:
                 response = requests.post(
                     f"{BASE_URL}/chat",
-                    json={"query": prompt},
+                    json={"query": prompt, "session_id": st.session_state.session_id},
                     timeout=60 # RAG 有时检索较慢，设置较长超时
                 )
                 

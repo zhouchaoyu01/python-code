@@ -1,6 +1,6 @@
 import os
 import logging
-from time import time
+import time
 from typing import List
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from langchain_core.documents import Document
 
 from core.vector_manager import VectorManager
 from core.config import settings
-
+from .hash_utils import calculate_file_hash # 引入新增工具
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -41,9 +41,11 @@ class DocumentProcessor:
                 return []
             docs = loader.load()
             for doc in docs:
-                doc.metadata["upload_time"] = time.time() # 记录上传时间
+                upload_time = time.time()
+                # print(upload_time)
+                doc.metadata["upload_time"] = upload_time # 记录上传时间
                 doc.metadata["file_name"] = os.path.basename(file_path)
-            return 
+            return docs
         except Exception as e:
             logger.error(f"解析文件 {file_path} 出错: {e}")
             return []
