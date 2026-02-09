@@ -32,11 +32,14 @@ doc_processor = DocumentProcessor()
 class ChatRequest(BaseModel):
     query: str
     session_id: str="default_session"
-
+class SourceItem(BaseModel):
+    index: int
+    file_name: str
+    content: str
 class ChatResponse(BaseModel):
     answer: str
     status: str
-
+    sources: List[SourceItem] = []  # 新增来源文件列表字段
 # --- 接口定义 ---
 
 @app.get("/")
@@ -125,6 +128,40 @@ async def chat(request: ChatRequest):
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+
+@app.post("/chat/v2", response_model=ChatResponse)
+async def chatv2(request: ChatRequest):
+    try:
+        chain = rag_engine.get_chain_with_source()
+        # 调用链
+        result = await chain.ainvoke(
+            {"input": request.query},
+            config={"configurable": {"session_id": request.session_id}}
+        )
+        
+        # 提取来源文件名 (去重)
+        raw_docs = result.get("context", [])
+        # 方案：构建一个有序的、包含索引的来源列表
+        sources = []
+        for i, doc in enumerate(raw_docs):
+            sources.append({
+                "index": i + 1,
+                "file_name": doc.metadata.get("file_name", "未知文件"),
+                "content": doc.page_content[:100] + "..." # 可选：给前端展示预览
+            })
+        
+        # 最终回答拼接或返回（这里可以只返回 answer，或者把来源列表也包进去）
+        # 我们将 source_files 放入 ChatResponse (需先在 Pydantic 中定义)
+        return {
+            "answer": result["answer"],
+            "status": "success",
+            "sources": sources # 建议给 ChatResponse 增加一个 sources 字段
+        }
+    except Exception as e:
+        logger.error(f"Chat Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 # --- 启动配置 ---
 if __name__ == "__main__":
     import uvicorn

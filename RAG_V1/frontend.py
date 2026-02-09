@@ -75,14 +75,24 @@ if prompt := st.chat_input("请输入您关于文档的问题..."):
         with st.spinner("思考中..."):
             try:
                 response = requests.post(
-                    f"{BASE_URL}/chat",
+                    f"{BASE_URL}/chat/v2",
                     json={"query": prompt, "session_id": st.session_state.session_id},
                     timeout=60 # RAG 有时检索较慢，设置较长超时
                 )
                 
                 if response.status_code == 200:
                     answer = response.json().get("answer", "未获取到回答")
+                    sources = response.json().get("sources", [])
                     st.markdown(answer)
+                    # 如果有来源，展示来源标签
+                    if sources:
+                        with st.expander("查看参考来源"):
+                            for s in sources:
+                                # 这里的 s['index'] 完美对应回答里的 [1], [2]
+                                st.write(f"**[{s['index']}] {s['file_name']}**")
+                                st.caption(f"内容摘要: {s['content']}")
+                    else:
+                        pass
                     # 保存到历史
                     st.session_state.messages.append({"role": "assistant", "content": answer})
                 else:

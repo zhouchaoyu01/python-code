@@ -68,8 +68,9 @@ class VectorManager:
             conn.execute("DELETE FROM file_records WHERE file_hash = ?", (file_hash,))
 
     def get_retriever(self):
-        logger.info(f"获取检索器，K={settings.top_k}, 阈值={0.5}")
+        logger.info(f"获取检索器，K={settings.top_k}")
         return self.vector_store.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"k": settings.top_k, "score_threshold": 0.5}
+            # search_type="similarity_score_threshold",
+             search_type="similarity", # 暂时不用 threshold 模式
+            search_kwargs={"k": settings.top_k}
         )

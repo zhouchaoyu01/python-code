@@ -7,3 +7,4 @@ aivenv/
 chroma_data/
 chat_history/
 ragv1/
+logs/

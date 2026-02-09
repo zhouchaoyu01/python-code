@@ -4,9 +4,13 @@ from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from .model_factory import ModelFactory
 from .vector_manager import VectorManager
 from operator import itemgetter # 引入这个工具，专门用于从字典取值
-
-
+import json
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
 from utils.logger import setup_logger
+
+
 logger = setup_logger("RAGEngine")
 
 def print_debug_prompt(prompt) -> ChatPromptTemplate:
@@ -17,9 +21,21 @@ def print_debug_prompt(prompt) -> ChatPromptTemplate:
     logger.info("===== Prompt End =====")
     return prompt
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_community.chat_message_histories import ChatMessageHistory
+def debug_step(data, step_name: str):
+    """自定义调试函数，打印数据内容和类型"""
+    logger.info(f"==== [DEBUG: {step_name}] Start ====")
+    # 打印数据类型
+    logger.info(f"Type: {type(data)}")
+    # 打印数据内容摘要
+    if isinstance(data, dict):
+        # 排除掉太长的 context 或 chat_history 以免刷屏
+        debug_info = {k: (str(v)[:100] + "...") if isinstance(v, str) else str(v) for k, v in data.items()}
+        logger.info(f"Content: {json.dumps(debug_info, ensure_ascii=False)}")
+    else:
+        logger.info(f"Content: {str(data)[:200]}...")
+    logger.info(f"==== [DEBUG: {step_name}] End ====\n")
+    return data
+
 
 store = {}
 
@@ -55,7 +71,21 @@ class RAGEngine:
             logger.warning("检索结果为空！可能是由于相似度阈值过滤了所有结果。")
             return "【暂无相关参考文档，请提示用户根据已知常识回答】"
         return "\n\n".join(unique_docs)
-    
+    def _format_docs_with_sources(self, docs):
+        """
+        格式化文档，并在内容前注入 [编号] 和 文件名
+        """
+        formatted_chunks = []
+        for i, doc in enumerate(docs):
+            source_name = doc.metadata.get("file_name", "未知文件")
+            # 格式示例：[1] (来源: manual.pdf): 内容内容...
+            content = f"[{i+1}] (来源: {source_name}):\n{doc.page_content}"
+            formatted_chunks.append(content)
+        
+        if not formatted_chunks:
+            return "【暂无参考资料】"
+        
+        return "\n\n".join(formatted_chunks)
     def get_chain(self):
         """
         使用 LCEL 构建 1.0 风格的 RAG 链
@@ -77,7 +107,7 @@ class RAGEngine:
         ])
         
         # 这是一个微型的 LCEL 链：Prompt -> LLM -> String
-        condense_question_chain = rephrase_prompt |RunnableLambda(print_debug_prompt)| self.llm | StrOutputParser() 
+        condense_question_chain = rephrase_prompt | self.llm | StrOutputParser() 
 
 
         # 2. 最终问答子链 (Answer Generation Chain)
@@ -117,4 +147,65 @@ class RAGEngine:
             get_session_history,
             input_messages_key="input",
             history_messages_key="chat_history",
+        )
+    
+
+    def get_chain_with_source(self):
+        
+        
+        # 1. 问题重写链 (保持不变)
+        rephrase_prompt = ChatPromptTemplate.from_messages([
+            ("system", "参考对话历史，将用户问题重写为独立的搜索查询。不要回答问题，只需重写。"),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+        ])
+        condense_question_chain = rephrase_prompt| self.llm | StrOutputParser()| RunnableLambda(lambda x: debug_step(x, "重写后的问题"))
+        logger.info(f"condense_question_chain: {condense_question_chain}")
+        # 2. 增强版问答 Prompt
+        # 明确要求 LLM 引用编号
+        qa_system_prompt = (
+            "你是一个专业的企业助手。请利用以下参考内容回答问题。\n"
+            "回答要求：\n"
+            "1. 必须根据参考内容回答，严禁编造。\n"
+            "2. **必须在每个回答段落末尾标注引用的来源编号，例如 [1] 或 [1][2]**。\n"
+            # "3. 如果参考内容中没有答案，请直说不知道。\n\n"
+            "参考内容:\n{context}"
+        )
+        qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", qa_system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+        ])
+
+        # 3. 构建 LCEL 链
+        # 我们使用一个 dict 包装结果，以便同时返回 answer 和 context(docs)
+        def get_answer_and_sources(data):
+            # 这个函数接收最终组装好的数据字典
+            final_chain = qa_prompt | self.llm | StrOutputParser()| RunnableLambda(lambda x: debug_step(x, "最终回答"))
+            return {
+                "answer": (final_chain).invoke(data),
+                "context": data["raw_docs"] # 将原始文档列表传出
+            }
+
+        full_rag_chain = (
+            RunnablePassthrough.assign(
+                standalone_question=condense_question_chain
+            )
+            | RunnablePassthrough.assign(
+                # 这一步检索出 raw_docs 列表，并生成格式化的 context 字符串
+                raw_docs=itemgetter("standalone_question") | self.retriever
+            )
+            | RunnableLambda(lambda x: debug_step(x, "检索后的完整字典")) # 观测检索结果
+            | RunnablePassthrough.assign(
+                context=lambda x: self._format_docs_with_sources(x["raw_docs"])
+            )
+            | RunnableLambda(get_answer_and_sources) # 最终产出字典
+        )
+
+        return RunnableWithMessageHistory(
+            full_rag_chain,
+            get_session_history, # 引用你代码中定义的 get_session_history
+            input_messages_key="input",
+            history_messages_key="chat_history",
+            # 注意：由于输出是字典，这里不再配置 output_messages_key 以便透传
         )
